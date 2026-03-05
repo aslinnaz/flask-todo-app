@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>To-Do</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+</head>
+<body>
+  <div class="container">
+    <header class="header">
+      <div>
+        <h1>To-Do</h1>
+        <p class="sub">Remaining: <b>{{ remaining }}</b> • Total: <b>{{ total }}</b></p>
+      </div>
+
+      <nav class="filters">
+        <a class="{{ 'active' if filter_value=='all' else '' }}" href="/?filter=all">All</a>
+        <a class="{{ 'active' if filter_value=='active' else '' }}" href="/?filter=active">Active</a>
+        <a class="{{ 'active' if filter_value=='completed' else '' }}" href="/?filter=completed">Completed</a>
+      </nav>
+    </header>
+
+    <form class="add" method="POST" action="{{ url_for('add', filter=filter_value) }}">
+      <input name="text" placeholder="Add a task..." autocomplete="off" />
+      <button type="submit">Add</button>
+    </form>
+
+    <section class="list">
+      {% for t in tasks %}
+        <div class="item {{ 'done' if t['done'] else '' }}">
+          <form method="POST" action="{{ url_for('toggle', task_id=t['id'], filter=filter_value) }}">
+            <button class="toggle" title="Toggle">
+              {{ "✅" if t["done"] else "⬜" }}
+            </button>
+          </form>
+
+          <div class="text">
+            <div class="task">{{ t["text"] }}</div>
+            <div class="meta">Created: {{ t["created_at"].replace("T"," ") }} UTC</div>
+          </div>
+
+          <form method="POST" action="{{ url_for('delete', task_id=t['id'], filter=filter_value) }}">
+            <button class="delete" title="Delete">🗑</button>
+          </form>
+        </div>
+      {% else %}
+        <div class="empty">No tasks here 👀</div>
+      {% endfor %}
+    </section>
+
+    <footer class="footer">
+      <form method="POST" action="{{ url_for('clear_completed', filter=filter_value) }}">
+        <button class="secondary" type="submit">Clear completed</button>
+      </form>
+      <div class="hint">Tip: Click the checkbox to mark done.</div>
+    </footer>
+  </div>
+</body>
+</html>
