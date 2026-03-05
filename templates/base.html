@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>{{ title or "Planner" }}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+</head>
+<body>
+  <div class="container">
+
+    <header class="topbar">
+      <div class="brand">
+        <div class="logo">🗂</div>
+        <div>
+          <div class="brand-title">Planner</div>
+          <div class="brand-sub">Timezone: <b>Istanbul</b></div>
+        </div>
+      </div>
+
+      <nav class="tabs">
+        <a class="{{ 'active' if active_tab=='tasks' else '' }}" href="{{ url_for('tasks_page') }}">Tasks</a>
+        <a class="{{ 'active' if active_tab=='ideas' else '' }}" href="{{ url_for('ideas_page') }}">Ideas (Eisenhower)</a>
+      </nav>
+
+      <button class="danger" type="button" onclick="closeApp()">Close App</button>
+    </header>
+
+    {% block content %}{% endblock %}
+
+  </div>
+
+  <script>
+    async function closeApp() {
+      try { await fetch("/shutdown", { method: "POST" }); } catch (e) {}
+
+      // Try closing tab/window (often blocked unless opened by script)
+      try {
+        window.open("", "_self");
+        window.close();
+      } catch (e) {}
+
+      // Fallback message if browser blocks close
+      document.body.innerHTML = `
+        <div style="font-family: ui-sans-serif, system-ui; padding: 40px; color: #e7eaf0; background:#0b0f1a; min-height:100vh;">
+          <h2>App closed ✅</h2>
+          <p>Server has been stopped.</p>
+          <p>Your browser may block scripts from closing this tab. You can safely close it now.</p>
+        </div>
+      `;
+    }
+  </script>
+</body>
+</html>

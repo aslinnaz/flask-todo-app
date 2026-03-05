@@ -1,0 +1,113 @@
+{% extends "base.html" %}
+{% set title = "Ideas (Eisenhower)" %}
+{% set active_tab = "ideas" %}
+
+{% block content %}
+  <section class="panel">
+    <div class="panel-head">
+      <div>
+        <h1>Ideas → Eisenhower Matrix</h1>
+        <div class="sub">Unchecked: <b>{{ remaining }}</b> • Total: <b>{{ total }}</b></div>
+      </div>
+    </div>
+
+    <form class="add" method="POST" action="{{ url_for('add_idea') }}">
+      <input name="text" placeholder="Type an idea..." autocomplete="off" />
+      <select name="label">
+        <option value="none">None</option>
+        <option value="important">Important</option>
+        <option value="urgent">Urgent</option>
+        <option value="both">Important + Urgent</option>
+      </select>
+      <button type="submit">Add</button>
+    </form>
+
+    <div class="matrix">
+      <div class="quad">
+        <div class="quad-title">Do Now (Important + Urgent)</div>
+        {% for i in quadrants["do_now"] %}
+          <div class="mini-item {{ 'done' if i['done'] else '' }}">
+            <form method="POST" action="{{ url_for('toggle_idea', idea_id=i['id']) }}">
+              <button class="toggle" title="Toggle">{{ "✅" if i["done"] else "⬜" }}</button>
+            </form>
+            <div class="text">
+              <div class="task">{{ i["text"] }}</div>
+              <div class="meta">Created: {{ i["created_at_utc"] | istanbul_time }}</div>
+            </div>
+            <form method="POST" action="{{ url_for('delete_idea', idea_id=i['id']) }}">
+              <button class="delete" title="Delete">🗑</button>
+            </form>
+          </div>
+        {% else %}
+          <div class="empty">—</div>
+        {% endfor %}
+      </div>
+
+      <div class="quad">
+        <div class="quad-title">Schedule (Important, Not Urgent)</div>
+        {% for i in quadrants["schedule"] %}
+          <div class="mini-item {{ 'done' if i['done'] else '' }}">
+            <form method="POST" action="{{ url_for('toggle_idea', idea_id=i['id']) }}">
+              <button class="toggle" title="Toggle">{{ "✅" if i["done"] else "⬜" }}</button>
+            </form>
+            <div class="text">
+              <div class="task">{{ i["text"] }}</div>
+              <div class="meta">Created: {{ i["created_at_utc"] | istanbul_time }}</div>
+            </div>
+            <form method="POST" action="{{ url_for('delete_idea', idea_id=i['id']) }}">
+              <button class="delete" title="Delete">🗑</button>
+            </form>
+          </div>
+        {% else %}
+          <div class="empty">—</div>
+        {% endfor %}
+      </div>
+
+      <div class="quad">
+        <div class="quad-title">Delegate (Urgent, Not Important)</div>
+        {% for i in quadrants["delegate"] %}
+          <div class="mini-item {{ 'done' if i['done'] else '' }}">
+            <form method="POST" action="{{ url_for('toggle_idea', idea_id=i['id']) }}">
+              <button class="toggle" title="Toggle">{{ "✅" if i["done"] else "⬜" }}</button>
+            </form>
+            <div class="text">
+              <div class="task">{{ i["text"] }}</div>
+              <div class="meta">Created: {{ i["created_at_utc"] | istanbul_time }}</div>
+            </div>
+            <form method="POST" action="{{ url_for('delete_idea', idea_id=i['id']) }}">
+              <button class="delete" title="Delete">🗑</button>
+            </form>
+          </div>
+        {% else %}
+          <div class="empty">—</div>
+        {% endfor %}
+      </div>
+
+      <div class="quad">
+        <div class="quad-title">Eliminate (Not Important, Not Urgent)</div>
+        {% for i in quadrants["eliminate"] %}
+          <div class="mini-item {{ 'done' if i['done'] else '' }}">
+            <form method="POST" action="{{ url_for('toggle_idea', idea_id=i['id']) }}">
+              <button class="toggle" title="Toggle">{{ "✅" if i["done"] else "⬜" }}</button>
+            </form>
+            <div class="text">
+              <div class="task">{{ i["text"] }}</div>
+              <div class="meta">Created: {{ i["created_at_utc"] | istanbul_time }}</div>
+            </div>
+            <form method="POST" action="{{ url_for('delete_idea', idea_id=i['id']) }}">
+              <button class="delete" title="Delete">🗑</button>
+            </form>
+          </div>
+        {% else %}
+          <div class="empty">—</div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div class="panel-foot">
+      <form method="POST" action="{{ url_for('clear_completed_ideas') }}">
+        <button class="secondary" type="submit">Clear checked ideas</button>
+      </form>
+    </div>
+  </section>
+{% endblock %}
