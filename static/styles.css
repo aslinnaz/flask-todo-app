@@ -2,29 +2,29 @@
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 :root {
-  --bg: #0a0a0f;
-  --surface: #111118;
-  --surface2: #18181f;
-  --border: #1e1e2a;
-  --border2: #2a2a3a;
-  --text: #e8e4dc;
-  --text-muted: #6b6b80;
-  --text-dim: #44444f;
-  --accent: #c8b89a;
-  --accent2: #a89070;
+  --bg: #0e0e14;
+  --surface: #15151e;
+  --surface2: #1c1c27;
+  --border: #26263a;
+  --border2: #34344e;
+  --text: #edeae0;
+  --text-muted: #8888a0;
+  --text-dim: #54545f;
+  --accent: #d4c4a8;
+  --accent2: #b8a080;
 
-  --do-color: #e05c5c;
-  --schedule-color: #5b8de0;
-  --delegate-color: #e0a040;
-  --eliminate-color: #60a060;
+  --do-color: #f08888;
+  --schedule-color: #7aaaff;
+  --delegate-color: #f0b868;
+  --eliminate-color: #7acc7a;
 
-  --overdue: #ff4444;
-  --today: #ff8c42;
-  --soon: #f0c040;
-  --upcoming: #60c898;
+  --overdue: #ff7070;
+  --today: #ffaa68;
+  --soon: #f8d870;
+  --upcoming: #7adcaa;
 }
 
-html { font-size: 15px; }
+html { font-size: 16px; }
 
 body {
   font-family: 'DM Sans', sans-serif;
@@ -32,7 +32,7 @@ body {
   color: var(--text);
   min-height: 100vh;
   display: flex;
-  line-height: 1.5;
+  line-height: 1.7;
 }
 
 /* ── Noise texture overlay ── */
@@ -101,11 +101,11 @@ body {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 10px 12px;
+  padding: 11px 12px;
   border-radius: 10px;
   text-decoration: none;
   color: var(--text-muted);
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 500;
   transition: all 0.15s;
   border: 1px solid transparent;
@@ -184,7 +184,7 @@ body {
 
 .page-title {
   font-family: 'DM Serif Display', serif;
-  font-size: 36px;
+  font-size: 40px;
   font-weight: 400;
   letter-spacing: -0.5px;
   color: var(--text);
@@ -192,8 +192,8 @@ body {
 }
 
 .page-sub {
-  margin-top: 6px;
-  font-size: 13px;
+  margin-top: 8px;
+  font-size: 14px;
   color: var(--text-muted);
   display: flex;
   align-items: center;
@@ -253,9 +253,9 @@ body {
   border: none;
   outline: none;
   color: var(--text);
-  font-size: 14px;
+  font-size: 15px;
   font-family: inherit;
-  padding: 8px 10px;
+  padding: 10px 12px;
 }
 
 .add-input::placeholder { color: var(--text-dim); }
@@ -289,13 +289,13 @@ body {
 }
 
 .add-btn {
-  padding: 8px 18px;
+  padding: 9px 20px;
   border-radius: 9px;
   border: 1px solid var(--border2);
   background: var(--surface2);
   color: var(--text);
   cursor: pointer;
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 600;
   font-family: inherit;
   transition: all 0.15s;
@@ -323,10 +323,10 @@ body {
 
 .filter-tab {
   text-decoration: none;
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 500;
   color: var(--text-muted);
-  padding: 6px 14px;
+  padding: 7px 15px;
   border-radius: 8px;
   border: 1px solid transparent;
   transition: all 0.15s;
@@ -351,8 +351,8 @@ body {
 .task-item {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 14px 16px;
+  gap: 14px;
+  padding: 16px 18px;
   border-bottom: 1px solid var(--border);
   transition: background 0.1s;
 }
@@ -399,9 +399,9 @@ body {
 .task-body { flex: 1; min-width: 0; }
 
 .task-text {
-  font-size: 14px;
+  font-size: 15px;
   color: var(--text);
-  line-height: 1.4;
+  line-height: 1.55;
 }
 
 .task-meta {
@@ -413,22 +413,22 @@ body {
 }
 
 .task-created {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--text-dim);
 }
 
 .deadline-badge {
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
-  padding: 2px 7px;
+  padding: 2px 8px;
   border-radius: 5px;
   letter-spacing: 0.2px;
 }
 
-.badge-overdue  { background: rgba(255,68,68,0.15);  color: var(--overdue); }
-.badge-today    { background: rgba(255,140,66,0.15); color: var(--today); }
-.badge-soon     { background: rgba(240,192,64,0.15); color: var(--soon); }
-.badge-upcoming { background: rgba(96,200,152,0.15); color: var(--upcoming); }
+.badge-overdue  { background: rgba(255,112,112,0.14); color: var(--overdue); }
+.badge-today    { background: rgba(255,170,104,0.14); color: var(--today); }
+.badge-soon     { background: rgba(248,216,112,0.14); color: var(--soon); }
+.badge-upcoming { background: rgba(122,220,170,0.14); color: var(--upcoming); }
 .badge-none     { background: var(--surface2); color: var(--text-muted); }
 
 .source-badge {
@@ -893,6 +893,53 @@ body {
   gap: 8px;
   justify-content: flex-end;
 }
+
+/* ── Priority Toggle (Matrix add form) ── */
+.matrix-add-form {
+  flex-wrap: wrap;
+  row-gap: 10px;
+}
+
+.priority-toggle-row {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 4px 4px;
+}
+
+.priority-toggle-label {
+  font-size: 13px;
+  color: var(--text-muted);
+  font-weight: 500;
+  flex-shrink: 0;
+}
+
+.priority-toggles {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.ptoggle {
+  padding: 6px 16px;
+  border-radius: 20px;
+  border: 1.5px solid var(--border2);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 13px;
+  font-weight: 500;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.ptoggle:hover { border-color: var(--border2); color: var(--text); background: var(--surface2); }
+
+#pt-none.active    { border-color: var(--border2); background: var(--surface2); color: var(--text); }
+.pt-important.active { border-color: var(--schedule-color); background: rgba(122,170,255,0.1); color: var(--schedule-color); }
+.pt-urgent.active    { border-color: var(--delegate-color); background: rgba(240,184,104,0.1); color: var(--delegate-color); }
+.pt-both.active      { border-color: var(--do-color); background: rgba(240,136,136,0.1); color: var(--do-color); }
 
 /* ── Responsive ── */
 @media (max-width: 800px) {

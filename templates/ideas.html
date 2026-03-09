@@ -16,17 +16,31 @@
   </div>
 </div>
 
-<form class="add-form" method="POST" action="{{ url_for('add_idea') }}">
-  <input name="text" placeholder="Add to matrix..." autocomplete="off" class="add-input" />
-  <select name="label" class="add-select">
-    <option value="none">No priority</option>
-    <option value="both">Important + Urgent</option>
-    <option value="important">Important only</option>
-    <option value="urgent">Urgent only</option>
-  </select>
+<form class="add-form matrix-add-form" method="POST" action="{{ url_for('add_idea') }}">
+  <input name="text" placeholder="What's the idea or task?" autocomplete="off" class="add-input" />
   <input name="deadline" type="date" class="add-date" title="Deadline (optional)" />
+  <input type="hidden" name="label" id="priorityValue" value="none" />
   <button type="submit" class="add-btn">Add</button>
+
+  <div class="priority-toggle-row">
+    <span class="priority-toggle-label">Priority:</span>
+    <div class="priority-toggles">
+      <button type="button" class="ptoggle" id="pt-none"    onclick="setPriority('none')"  >None</button>
+      <button type="button" class="ptoggle pt-important" id="pt-important" onclick="setPriority('important')">Important</button>
+      <button type="button" class="ptoggle pt-urgent"    id="pt-urgent"    onclick="setPriority('urgent')">Urgent</button>
+      <button type="button" class="ptoggle pt-both"      id="pt-both"      onclick="setPriority('both')">Both</button>
+    </div>
+  </div>
 </form>
+
+<script>
+  setPriority('none');
+  function setPriority(val) {
+    document.getElementById('priorityValue').value = val;
+    document.querySelectorAll('.ptoggle').forEach(b => b.classList.remove('active'));
+    document.getElementById('pt-' + val).classList.add('active');
+  }
+</script>
 
 <div class="matrix-grid">
 
