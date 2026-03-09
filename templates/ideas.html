@@ -1,113 +1,160 @@
 {% extends "base.html" %}
-{% set title = "Ideas (Eisenhower)" %}
+{% set title = "Matrix — Focus" %}
 {% set active_tab = "ideas" %}
 
 {% block content %}
-  <section class="panel">
-    <div class="panel-head">
+<div class="page-header">
+  <div>
+    <h1 class="page-title">Eisenhower Matrix</h1>
+    <p class="page-sub">
+      <span class="stat">{{ remaining }} active</span>
+      <span class="dot">·</span>
+      <span class="stat">{{ total }} total</span>
+      <span class="dot">·</span>
+      <span class="sub-note">Tasks added here sync to your task list</span>
+    </p>
+  </div>
+</div>
+
+<form class="add-form" method="POST" action="{{ url_for('add_idea') }}">
+  <input name="text" placeholder="Add to matrix..." autocomplete="off" class="add-input" />
+  <select name="label" class="add-select">
+    <option value="none">No priority</option>
+    <option value="both">Important + Urgent</option>
+    <option value="important">Important only</option>
+    <option value="urgent">Urgent only</option>
+  </select>
+  <input name="deadline" type="date" class="add-date" title="Deadline (optional)" />
+  <button type="submit" class="add-btn">Add</button>
+</form>
+
+<div class="matrix-grid">
+
+  <div class="quad quad-do">
+    <div class="quad-header">
+      <div class="quad-dot dot-do"></div>
       <div>
-        <h1>Ideas → Eisenhower Matrix</h1>
-        <div class="sub">Unchecked: <b>{{ remaining }}</b> • Total: <b>{{ total }}</b></div>
+        <div class="quad-label">Do Now</div>
+        <div class="quad-desc">Important & Urgent</div>
       </div>
+      <span class="quad-count">{{ quadrants["do_now"] | length }}</span>
     </div>
-
-    <form class="add" method="POST" action="{{ url_for('add_idea') }}">
-      <input name="text" placeholder="Type an idea..." autocomplete="off" />
-      <select name="label">
-        <option value="none">None</option>
-        <option value="important">Important</option>
-        <option value="urgent">Urgent</option>
-        <option value="both">Important + Urgent</option>
-      </select>
-      <button type="submit">Add</button>
-    </form>
-
-    <div class="matrix">
-      <div class="quad">
-        <div class="quad-title">Do Now (Important + Urgent)</div>
-        {% for i in quadrants["do_now"] %}
-          <div class="mini-item {{ 'done' if i['done'] else '' }}">
-            <form method="POST" action="{{ url_for('toggle_idea', idea_id=i['id']) }}">
-              <button class="toggle" title="Toggle">{{ "✅" if i["done"] else "⬜" }}</button>
-            </form>
-            <div class="text">
-              <div class="task">{{ i["text"] }}</div>
-              <div class="meta">Created: {{ i["created_at_utc"] | istanbul_time }}</div>
-            </div>
-            <form method="POST" action="{{ url_for('delete_idea', idea_id=i['id']) }}">
-              <button class="delete" title="Delete">🗑</button>
-            </form>
-          </div>
-        {% else %}
-          <div class="empty">—</div>
-        {% endfor %}
+    {% for i in quadrants["do_now"] %}
+      {% set urgency = i["deadline"] | deadline_urgency %}
+      <div class="matrix-item {{ 'done' if i['done'] else '' }}">
+        <form method="POST" action="{{ url_for('toggle_idea', idea_id=i['id']) }}">
+          <button class="check-btn sm" title="Toggle"><span class="check-icon">{{ "✓" if i["done"] else "" }}</span></button>
+        </form>
+        <div class="task-body">
+          <div class="task-text">{{ i["text"] }}</div>
+          {% if i["deadline"] %}
+            <span class="deadline-badge badge-{{ urgency }}">{{ i["deadline"] | deadline_display }}</span>
+          {% endif %}
+        </div>
+        <form method="POST" action="{{ url_for('delete_idea', idea_id=i['id']) }}">
+          <button class="del-btn" title="Delete">✕</button>
+        </form>
       </div>
+    {% else %}
+      <div class="quad-empty">Nothing here</div>
+    {% endfor %}
+  </div>
 
-      <div class="quad">
-        <div class="quad-title">Schedule (Important, Not Urgent)</div>
-        {% for i in quadrants["schedule"] %}
-          <div class="mini-item {{ 'done' if i['done'] else '' }}">
-            <form method="POST" action="{{ url_for('toggle_idea', idea_id=i['id']) }}">
-              <button class="toggle" title="Toggle">{{ "✅" if i["done"] else "⬜" }}</button>
-            </form>
-            <div class="text">
-              <div class="task">{{ i["text"] }}</div>
-              <div class="meta">Created: {{ i["created_at_utc"] | istanbul_time }}</div>
-            </div>
-            <form method="POST" action="{{ url_for('delete_idea', idea_id=i['id']) }}">
-              <button class="delete" title="Delete">🗑</button>
-            </form>
-          </div>
-        {% else %}
-          <div class="empty">—</div>
-        {% endfor %}
+  <div class="quad quad-schedule">
+    <div class="quad-header">
+      <div class="quad-dot dot-schedule"></div>
+      <div>
+        <div class="quad-label">Schedule</div>
+        <div class="quad-desc">Important, Not Urgent</div>
       </div>
-
-      <div class="quad">
-        <div class="quad-title">Delegate (Urgent, Not Important)</div>
-        {% for i in quadrants["delegate"] %}
-          <div class="mini-item {{ 'done' if i['done'] else '' }}">
-            <form method="POST" action="{{ url_for('toggle_idea', idea_id=i['id']) }}">
-              <button class="toggle" title="Toggle">{{ "✅" if i["done"] else "⬜" }}</button>
-            </form>
-            <div class="text">
-              <div class="task">{{ i["text"] }}</div>
-              <div class="meta">Created: {{ i["created_at_utc"] | istanbul_time }}</div>
-            </div>
-            <form method="POST" action="{{ url_for('delete_idea', idea_id=i['id']) }}">
-              <button class="delete" title="Delete">🗑</button>
-            </form>
-          </div>
-        {% else %}
-          <div class="empty">—</div>
-        {% endfor %}
-      </div>
-
-      <div class="quad">
-        <div class="quad-title">Eliminate (Not Important, Not Urgent)</div>
-        {% for i in quadrants["eliminate"] %}
-          <div class="mini-item {{ 'done' if i['done'] else '' }}">
-            <form method="POST" action="{{ url_for('toggle_idea', idea_id=i['id']) }}">
-              <button class="toggle" title="Toggle">{{ "✅" if i["done"] else "⬜" }}</button>
-            </form>
-            <div class="text">
-              <div class="task">{{ i["text"] }}</div>
-              <div class="meta">Created: {{ i["created_at_utc"] | istanbul_time }}</div>
-            </div>
-            <form method="POST" action="{{ url_for('delete_idea', idea_id=i['id']) }}">
-              <button class="delete" title="Delete">🗑</button>
-            </form>
-          </div>
-        {% else %}
-          <div class="empty">—</div>
-        {% endfor %}
-      </div>
+      <span class="quad-count">{{ quadrants["schedule"] | length }}</span>
     </div>
+    {% for i in quadrants["schedule"] %}
+      {% set urgency = i["deadline"] | deadline_urgency %}
+      <div class="matrix-item {{ 'done' if i['done'] else '' }}">
+        <form method="POST" action="{{ url_for('toggle_idea', idea_id=i['id']) }}">
+          <button class="check-btn sm" title="Toggle"><span class="check-icon">{{ "✓" if i["done"] else "" }}</span></button>
+        </form>
+        <div class="task-body">
+          <div class="task-text">{{ i["text"] }}</div>
+          {% if i["deadline"] %}
+            <span class="deadline-badge badge-{{ urgency }}">{{ i["deadline"] | deadline_display }}</span>
+          {% endif %}
+        </div>
+        <form method="POST" action="{{ url_for('delete_idea', idea_id=i['id']) }}">
+          <button class="del-btn" title="Delete">✕</button>
+        </form>
+      </div>
+    {% else %}
+      <div class="quad-empty">Nothing here</div>
+    {% endfor %}
+  </div>
 
-    <div class="panel-foot">
-      <form method="POST" action="{{ url_for('clear_completed_ideas') }}">
-        <button class="secondary" type="submit">Clear checked ideas</button>
-      </form>
+  <div class="quad quad-delegate">
+    <div class="quad-header">
+      <div class="quad-dot dot-delegate"></div>
+      <div>
+        <div class="quad-label">Delegate</div>
+        <div class="quad-desc">Urgent, Not Important</div>
+      </div>
+      <span class="quad-count">{{ quadrants["delegate"] | length }}</span>
     </div>
-  </section>
+    {% for i in quadrants["delegate"] %}
+      {% set urgency = i["deadline"] | deadline_urgency %}
+      <div class="matrix-item {{ 'done' if i['done'] else '' }}">
+        <form method="POST" action="{{ url_for('toggle_idea', idea_id=i['id']) }}">
+          <button class="check-btn sm" title="Toggle"><span class="check-icon">{{ "✓" if i["done"] else "" }}</span></button>
+        </form>
+        <div class="task-body">
+          <div class="task-text">{{ i["text"] }}</div>
+          {% if i["deadline"] %}
+            <span class="deadline-badge badge-{{ urgency }}">{{ i["deadline"] | deadline_display }}</span>
+          {% endif %}
+        </div>
+        <form method="POST" action="{{ url_for('delete_idea', idea_id=i['id']) }}">
+          <button class="del-btn" title="Delete">✕</button>
+        </form>
+      </div>
+    {% else %}
+      <div class="quad-empty">Nothing here</div>
+    {% endfor %}
+  </div>
+
+  <div class="quad quad-eliminate">
+    <div class="quad-header">
+      <div class="quad-dot dot-eliminate"></div>
+      <div>
+        <div class="quad-label">Eliminate</div>
+        <div class="quad-desc">Not Important, Not Urgent</div>
+      </div>
+      <span class="quad-count">{{ quadrants["eliminate"] | length }}</span>
+    </div>
+    {% for i in quadrants["eliminate"] %}
+      {% set urgency = i["deadline"] | deadline_urgency %}
+      <div class="matrix-item {{ 'done' if i['done'] else '' }}">
+        <form method="POST" action="{{ url_for('toggle_idea', idea_id=i['id']) }}">
+          <button class="check-btn sm" title="Toggle"><span class="check-icon">{{ "✓" if i["done"] else "" }}</span></button>
+        </form>
+        <div class="task-body">
+          <div class="task-text">{{ i["text"] }}</div>
+          {% if i["deadline"] %}
+            <span class="deadline-badge badge-{{ urgency }}">{{ i["deadline"] | deadline_display }}</span>
+          {% endif %}
+        </div>
+        <form method="POST" action="{{ url_for('delete_idea', idea_id=i['id']) }}">
+          <button class="del-btn" title="Delete">✕</button>
+        </form>
+      </div>
+    {% else %}
+      <div class="quad-empty">Nothing here</div>
+    {% endfor %}
+  </div>
+
+</div>
+
+<div class="list-footer">
+  <form method="POST" action="{{ url_for('clear_completed_ideas') }}">
+    <button class="ghost-btn">Clear completed</button>
+  </form>
+</div>
 {% endblock %}

@@ -1,52 +1,84 @@
 {% extends "base.html" %}
-{% set title = "Tasks" %}
+{% set title = "Tasks — Focus" %}
 {% set active_tab = "tasks" %}
 
 {% block content %}
-  <section class="panel">
-    <div class="panel-head">
-      <div>
-        <h1>Tasks</h1>
-        <div class="sub">Remaining: <b>{{ remaining }}</b> • Total: <b>{{ total }}</b></div>
-      </div>
-
-      <div class="filters">
-        <a class="{{ 'active' if filter_value=='all' else '' }}" href="/?filter=all">All</a>
-        <a class="{{ 'active' if filter_value=='active' else '' }}" href="/?filter=active">Active</a>
-        <a class="{{ 'active' if filter_value=='completed' else '' }}" href="/?filter=completed">Completed</a>
-      </div>
+<div class="page-header">
+  <div>
+    <h1 class="page-title">Tasks</h1>
+    <p class="page-sub">
+      <span class="stat">{{ remaining }} remaining</span>
+      <span class="dot">·</span>
+      <span class="stat">{{ total }} total</span>
+      {% if overdue > 0 %}
+        <span class="dot">·</span>
+        <span class="stat overdue-stat">{{ overdue }} overdue</span>
+      {% endif %}
+    </p>
+  </div>
+  <div class="header-actions">
+    <div class="sort-group">
+      <a href="?filter={{ filter_value }}&sort=deadline" class="sort-btn {{ 'active' if sort_value=='deadline' else '' }}">By deadline</a>
+      <a href="?filter={{ filter_value }}&sort=created" class="sort-btn {{ 'active' if sort_value=='created' else '' }}">By date</a>
     </div>
+  </div>
+</div>
 
-    <form class="add" method="POST" action="{{ url_for('add_task', filter=filter_value) }}">
-      <input name="text" placeholder="Add a task..." autocomplete="off" />
-      <button type="submit">Add</button>
-    </form>
+<form class="add-form" method="POST" action="{{ url_for('add_task', filter=filter_value, sort=sort_value) }}">
+  <input name="text" placeholder="What needs to get done?" autocomplete="off" class="add-input" />
+  <input name="deadline" type="date" class="add-date" title="Deadline (optional)" />
+  <button type="submit" class="add-btn">Add</button>
+</form>
 
-    <div class="list">
-      {% for t in tasks %}
-        <div class="item {{ 'done' if t['done'] else '' }}">
-          <form method="POST" action="{{ url_for('toggle_task', task_id=t['id'], filter=filter_value) }}">
-            <button class="toggle" title="Toggle">{{ "✅" if t["done"] else "⬜" }}</button>
-          </form>
+<div class="filter-tabs">
+  <a href="?filter=all&sort={{ sort_value }}" class="filter-tab {{ 'active' if filter_value=='all' else '' }}">All</a>
+  <a href="?filter=active&sort={{ sort_value }}" class="filter-tab {{ 'active' if filter_value=='active' else '' }}">Active</a>
+  <a href="?filter=completed&sort={{ sort_value }}" class="filter-tab {{ 'active' if filter_value=='completed' else '' }}">Completed</a>
+</div>
 
-          <div class="text">
-            <div class="task">{{ t["text"] }}</div>
-            <div class="meta">Created: {{ t["created_at_utc"] | istanbul_time }}</div>
-          </div>
+<div class="task-list">
+  {% for t in tasks %}
+    {% set urgency = t["deadline"] | deadline_urgency %}
+    <div class="task-item {{ 'done' if t['done'] else '' }} urgency-{{ urgency }}">
+      <form method="POST" action="{{ url_for('toggle_task', task_id=t['id'], filter=filter_value, sort=sort_value) }}">
+        <button class="check-btn" title="Toggle">
+          <span class="check-icon">{{ "✓" if t["done"] else "" }}</span>
+        </button>
+      </form>
 
-          <form method="POST" action="{{ url_for('delete_task', task_id=t['id'], filter=filter_value) }}">
-            <button class="delete" title="Delete">🗑</button>
-          </form>
+      <div class="task-body">
+        <div class="task-text">{{ t["text"] }}</div>
+        <div class="task-meta">
+          {% if t["deadline"] %}
+            <span class="deadline-badge badge-{{ urgency }}">
+              {% if urgency == "overdue" %}⚠ {% elif urgency == "today" %}● {% elif urgency == "soon" %}◐ {% endif %}
+              {{ t["deadline"] | deadline_display }}
+            </span>
+          {% endif %}
+          {% if t["source"] == "matrix" %}
+            <span class="source-badge">from matrix</span>
+          {% elif t["source"] == "ai" %}
+            <span class="source-badge ai-badge">AI</span>
+          {% endif %}
+          <span class="task-created">{{ t["created_at_utc"] | istanbul_time }}</span>
         </div>
-      {% else %}
-        <div class="empty">No tasks here 👀</div>
-      {% endfor %}
-    </div>
+      </div>
 
-    <div class="panel-foot">
-      <form method="POST" action="{{ url_for('clear_completed_tasks', filter=filter_value) }}">
-        <button class="secondary" type="submit">Clear completed</button>
+      <form method="POST" action="{{ url_for('delete_task', task_id=t['id'], filter=filter_value, sort=sort_value) }}">
+        <button class="del-btn" title="Delete">✕</button>
       </form>
     </div>
-  </section>
+  {% else %}
+    <div class="empty-state">
+      <div class="empty-icon">◌</div>
+      <div>No tasks here</div>
+    </div>
+  {% endfor %}
+</div>
+
+<div class="list-footer">
+  <form method="POST" action="{{ url_for('clear_completed_tasks', filter=filter_value) }}">
+    <button class="ghost-btn">Clear completed</button>
+  </form>
+</div>
 {% endblock %}

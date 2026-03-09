@@ -1,0 +1,218 @@
+{% extends "base.html" %}
+{% set title = "AI Assistant — Focus" %}
+{% set active_tab = "chat" %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-title">AI Assistant</h1>
+    <p class="page-sub">Describe a problem — I'll break it into tasks for you.</p>
+  </div>
+  <button class="ghost-btn" onclick="showApiKeyModal()">⚙ API Key</button>
+</div>
+
+<div class="chat-container">
+  <div class="chat-messages" id="chatMessages">
+    <div class="chat-msg assistant">
+      <div class="msg-bubble">
+        <p>Hi! I'm your productivity assistant. Tell me about something you're working on or a problem you're facing — even if it's vague. I'll ask a few questions and then break it down into clear, prioritised tasks.</p>
+        <p>For example: <em>"I need to launch my portfolio website"</em> or <em>"I'm overwhelmed with work emails"</em></p>
+      </div>
+    </div>
+  </div>
+
+  <div class="chat-input-area">
+    <div id="taskSuggestions" class="task-suggestions hidden"></div>
+    <div class="chat-input-row">
+      <textarea id="chatInput" placeholder="Describe your problem or project..." rows="2" onkeydown="handleKey(event)"></textarea>
+      <button class="send-btn" onclick="sendMessage()" id="sendBtn">
+        <span>↑</span>
+      </button>
+    </div>
+    <div class="chat-hint">Press Enter to send · Shift+Enter for new line</div>
+  </div>
+</div>
+
+<!-- API Key Modal -->
+<div id="apiKeyModal" class="modal-overlay hidden">
+  <div class="modal">
+    <div class="modal-title">OpenAI API Key</div>
+    <p class="modal-desc">Your key is stored only in your browser's session memory and never sent to our servers — only directly to OpenAI.</p>
+    <input type="password" id="apiKeyInput" placeholder="sk-..." class="modal-input" />
+    <div class="modal-actions">
+      <button class="ghost-btn" onclick="closeApiKeyModal()">Cancel</button>
+      <button class="add-btn" onclick="saveApiKey()">Save Key</button>
+    </div>
+  </div>
+</div>
+
+<script>
+let apiKey = sessionStorage.getItem("openai_api_key") || "";
+let conversationHistory = [];
+let pendingTasks = [];
+
+function showApiKeyModal() {
+  document.getElementById("apiKeyInput").value = apiKey;
+  document.getElementById("apiKeyModal").classList.remove("hidden");
+}
+function closeApiKeyModal() {
+  document.getElementById("apiKeyModal").classList.add("hidden");
+}
+function saveApiKey() {
+  apiKey = document.getElementById("apiKeyInput").value.trim();
+  sessionStorage.setItem("openai_api_key", apiKey);
+  closeApiKeyModal();
+  addSystemMsg("API key saved for this session ✓");
+}
+
+function handleKey(e) {
+  if (e.key === "Enter" && !e.shiftKey) {
+    e.preventDefault();
+    sendMessage();
+  }
+}
+
+function addSystemMsg(text) {
+  const msgs = document.getElementById("chatMessages");
+  const div = document.createElement("div");
+  div.className = "chat-msg system";
+  div.innerHTML = `<div class="msg-bubble">${text}</div>`;
+  msgs.appendChild(div);
+  msgs.scrollTop = msgs.scrollHeight;
+}
+
+function addMessage(role, text) {
+  const msgs = document.getElementById("chatMessages");
+  const div = document.createElement("div");
+  div.className = `chat-msg ${role}`;
+  div.innerHTML = `<div class="msg-bubble">${marked(text)}</div>`;
+  msgs.appendChild(div);
+  msgs.scrollTop = msgs.scrollHeight;
+}
+
+function marked(text) {
+  // Simple markdown: bold, italic, lists
+  return text
+    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+    .replace(/\*(.*?)\*/g, '<em>$1</em>')
+    .replace(/^- (.+)$/gm, '<li>$1</li>')
+    .replace(/(<li>.*<\/li>)/s, '<ul>$1</ul>')
+    .replace(/\n/g, '<br>');
+}
+
+function showTaskSuggestions(tasks) {
+  pendingTasks = tasks;
+  const container = document.getElementById("taskSuggestions");
+  container.innerHTML = `
+    <div class="suggestions-header">
+      <span>✦ Suggested tasks (${tasks.length})</span>
+      <div class="suggestions-actions">
+        <button class="add-btn sm" onclick="addAllTasks()">Add all to planner</button>
+        <button class="ghost-btn sm" onclick="dismissSuggestions()">Dismiss</button>
+      </div>
+    </div>
+    <div class="suggestions-list">
+      ${tasks.map((t, i) => `
+        <div class="suggestion-item" id="suggestion-${i}">
+          <div class="suggestion-text">${t.text}</div>
+          <div class="suggestion-meta">
+            <span class="priority-badge p-${(t.label||'none').replace('+','-')}">${t.label || 'none'}</span>
+            ${t.deadline ? `<span class="deadline-badge badge-upcoming">${t.deadline}</span>` : ''}
+          </div>
+          <button class="ghost-btn sm" onclick="addSingleTask(${i})">Add</button>
+        </div>
+      `).join('')}
+    </div>
+  `;
+  container.classList.remove("hidden");
+}
+
+function dismissSuggestions() {
+  document.getElementById("taskSuggestions").classList.add("hidden");
+  pendingTasks = [];
+}
+
+async function addAllTasks() {
+  const btn = event.target;
+  btn.disabled = true;
+  btn.textContent = "Adding...";
+  const resp = await fetch("/api/add_tasks_from_chat", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({tasks: pendingTasks})
+  });
+  const data = await resp.json();
+  dismissSuggestions();
+  addSystemMsg(`✓ ${data.added} tasks added to your planner and matrix.`);
+}
+
+async function addSingleTask(i) {
+  const task = pendingTasks[i];
+  const resp = await fetch("/api/add_tasks_from_chat", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({tasks: [task]})
+  });
+  document.getElementById(`suggestion-${i}`).style.opacity = "0.4";
+  document.getElementById(`suggestion-${i}`).querySelector("button").textContent = "Added ✓";
+}
+
+async function sendMessage() {
+  const input = document.getElementById("chatInput");
+  const text = input.value.trim();
+  if (!text) return;
+
+  if (!apiKey) {
+    showApiKeyModal();
+    return;
+  }
+
+  input.value = "";
+  addMessage("user", text);
+  conversationHistory.push({role: "user", content: text});
+
+  const sendBtn = document.getElementById("sendBtn");
+  sendBtn.disabled = true;
+  sendBtn.innerHTML = '<span class="spinner"></span>';
+
+  // Add typing indicator
+  const msgs = document.getElementById("chatMessages");
+  const typing = document.createElement("div");
+  typing.className = "chat-msg assistant typing";
+  typing.innerHTML = '<div class="msg-bubble"><span class="typing-dots"><span></span><span></span><span></span></span></div>';
+  msgs.appendChild(typing);
+  msgs.scrollTop = msgs.scrollHeight;
+
+  try {
+    const resp = await fetch("/api/chat", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({messages: conversationHistory, api_key: apiKey})
+    });
+    const data = await resp.json();
+    typing.remove();
+
+    if (data.error) {
+      addSystemMsg(`⚠ Error: ${data.error}`);
+    } else {
+      addMessage("assistant", data.reply);
+      conversationHistory.push({role: "assistant", content: data.reply});
+      if (data.tasks && data.tasks.length > 0) {
+        showTaskSuggestions(data.tasks);
+      }
+    }
+  } catch (e) {
+    typing.remove();
+    addSystemMsg("⚠ Network error. Is the server running?");
+  }
+
+  sendBtn.disabled = false;
+  sendBtn.innerHTML = '<span>↑</span>';
+}
+
+// Show modal if no key yet
+if (!apiKey) {
+  setTimeout(() => addSystemMsg('💡 Add your OpenAI API key via the <strong>⚙ API Key</strong> button above to get started.'), 500);
+}
+</script>
+{% endblock %}
