@@ -140,16 +140,26 @@ def tasks_page():
     sort_value = request.args.get("sort", "deadline")  # deadline | created
     db = get_db()
 
-    base_query = "SELECT * FROM tasks"
+    where_clause = ""
     if filter_value == "active":
-        base_query += " WHERE done=0"
+        where_clause = " WHERE t.done=0"
     elif filter_value == "completed":
-        base_query += " WHERE done=1"
+        where_clause = " WHERE t.done=1"
 
     if sort_value == "deadline":
-        base_query += " ORDER BY CASE WHEN deadline IS NULL OR deadline='' THEN 1 ELSE 0 END, deadline ASC, id DESC"
+        order_clause = " ORDER BY CASE WHEN t.deadline IS NULL OR t.deadline='' THEN 1 ELSE 0 END, t.deadline ASC, t.id DESC"
     else:
-        base_query += " ORDER BY id DESC"
+        order_clause = " ORDER BY t.id DESC"
+
+    base_query = (
+        "SELECT t.*, "
+        "CASE WHEN i.important=1 AND i.urgent=1 THEN 'both' "
+        "WHEN i.important=1 THEN 'important' "
+        "WHEN i.urgent=1 THEN 'urgent' "
+        "ELSE NULL END as matrix_label "
+        "FROM tasks t LEFT JOIN ideas i ON i.text=t.text"
+        + where_clause + order_clause
+    )
 
     tasks = db.execute(base_query).fetchall()
     total = db.execute("SELECT COUNT(*) AS c FROM tasks").fetchone()["c"]
@@ -198,6 +208,9 @@ def toggle_task(task_id):
 @app.route("/tasks/delete/<int:task_id>", methods=["POST"])
 def delete_task(task_id):
     db = get_db()
+    row = db.execute("SELECT text, deadline FROM tasks WHERE id=?", (task_id,)).fetchone()
+    if row:
+        db.execute("DELETE FROM ideas WHERE text=?", (row["text"],))
     db.execute("DELETE FROM tasks WHERE id=?", (task_id,))
     db.commit()
     return redirect(url_for("tasks_page", filter=request.args.get("filter", "all"), sort=request.args.get("sort", "deadline")))
@@ -280,6 +293,9 @@ def toggle_idea(idea_id):
 @app.route("/ideas/delete/<int:idea_id>", methods=["POST"])
 def delete_idea(idea_id):
     db = get_db()
+    row = db.execute("SELECT text FROM ideas WHERE id=?", (idea_id,)).fetchone()
+    if row:
+        db.execute("DELETE FROM tasks WHERE text=?", (row["text"],))
     db.execute("DELETE FROM ideas WHERE id=?", (idea_id,))
     db.commit()
     return redirect(url_for("ideas_page"))
@@ -312,7 +328,9 @@ def api_chat():
         if not api_key:
             return jsonify({"error": "No OpenAI API key provided. Add it in the chat settings."}), 400
 
-        system_prompt = """You are a smart productivity assistant embedded in a To-Do + Eisenhower Matrix planner app.
+        today_str = datetime.now(IST).strftime("%Y-%m-%d")
+        system_prompt = f"""You are a smart productivity assistant embedded in a To-Do + Eisenhower Matrix planner app.
+Today's date is {today_str}. Use this when the user mentions "today", "tomorrow", "this week", etc.
 
 Your job:
 1. Help users clarify vague problems into concrete, actionable tasks.
@@ -324,8 +342,8 @@ Your job:
 When you have enough info to create tasks, output a JSON block at the END of your message like:
 <tasks>
 [
-  {"text": "Task description", "label": "important+urgent", "deadline": "2025-12-31"},
-  {"text": "Another task", "label": "important", "deadline": null}
+  {{"text": "Task description", "label": "important+urgent", "deadline": "{today_str}"}},
+  {{"text": "Another task", "label": "important", "deadline": null}}
 ]
 </tasks>
 
