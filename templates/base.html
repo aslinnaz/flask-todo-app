@@ -30,6 +30,10 @@
         <span class="nav-icon">◎</span>
         <span>AI Assistant</span>
       </a>
+      <a href="{{ url_for('calendar_page') }}" class="nav-item {{ 'active' if active_tab=='calendar' else '' }}">
+        <span class="nav-icon">▦</span>
+        <span>Calendar</span>
+      </a>
     </nav>
 
     <div class="sidebar-footer">
@@ -49,17 +53,10 @@
       if (!confirm("Shut down the server and close the app?")) return;
       try { await fetch("/shutdown", { method: "POST" }); } catch (e) {}
       document.body.innerHTML = `
-        <div style="display:flex;align-items:center;justify-content:center;min-height:100vh;width:100%;background:#f4f1ec;font-family:'DM Sans',sans-serif;">
-          <div style="display:flex;flex-direction:column;align-items:center;text-align:center;gap:0;">
-            <div style="width:64px;height:64px;border-radius:18px;background:#8a6d4c;display:flex;align-items:center;justify-content:center;margin-bottom:28px;box-shadow:0 4px 24px rgba(138,109,76,0.3);">
-              <span style="font-family:'DM Serif Display',serif;font-size:30px;color:#fff;line-height:1;">F</span>
-            </div>
-            <div style="font-family:'DM Serif Display',serif;font-size:36px;color:#2c271f;letter-spacing:-0.5px;margin-bottom:12px;">Until next time.</div>
-            <div style="font-size:14px;color:#897e70;margin-bottom:36px;">Focus has been closed. Your tasks are saved.</div>
-            <div style="display:flex;align-items:center;gap:8px;padding:10px 20px;border-radius:10px;background:#faf8f4;border:1px solid #e2dbd0;font-size:13px;color:#b5ad9f;">
-              <span style="opacity:0.5;">⏻</span> You can safely close this tab
-            </div>
-          </div>
+        <div style="display:flex;align-items:center;justify-content:center;min-height:100vh;background:#0a0a0f;color:#888;font-family:'DM Sans',sans-serif;flex-direction:column;gap:16px;">
+          <div style="font-size:48px;">⏻</div>
+          <div style="font-size:20px;color:#e8e4dc;">Server stopped.</div>
+          <div style="font-size:14px;">You can safely close this tab.</div>
         </div>`;
     }
   </script>

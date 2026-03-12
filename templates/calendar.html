@@ -1,0 +1,321 @@
+{% extends "base.html" %}
+{% set title = "Calendar — Focus" %}
+{% set active_tab = "calendar" %}
+
+{% block content %}
+<div class="cal-header">
+  <div class="cal-nav">
+    <button class="cal-nav-btn" onclick="shiftPeriod(-1)">‹</button>
+    <button class="cal-nav-btn today-btn" onclick="goToday()">Today</button>
+    <button class="cal-nav-btn" onclick="shiftPeriod(1)">›</button>
+    <span class="cal-period-label" id="calPeriodLabel"></span>
+  </div>
+  <div class="cal-view-toggle">
+    <button class="cal-view-btn active" id="btnMonth" onclick="setView('month')">Month</button>
+    <button class="cal-view-btn" id="btnWeek"  onclick="setView('week')">Week</button>
+    <button class="cal-view-btn" id="btnDay"   onclick="setView('day')">Day</button>
+  </div>
+</div>
+
+<div id="calBody"></div>
+
+<div class="cal-unscheduled" id="unscheduledPanel">
+  <div class="cal-unscheduled-header" onclick="toggleUnscheduled()">
+    <span>◌</span>
+    <span>Tasks without a deadline</span>
+    <span id="unscheduledCount" style="margin-left:auto;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:2px 8px;font-size:12px;color:var(--text-muted);">0</span>
+    <span id="unscheduledChevron" style="margin-left:6px;font-size:11px;color:var(--text-dim);">▾</span>
+  </div>
+  <div class="cal-unscheduled-body" id="unscheduledBody" style="display:none;"></div>
+</div>
+
+<script id="calTaskData" type="application/json">{{ tasks_json|safe }}</script>
+<script>
+// ── Data ──────────────────────────────────────────────────────────────
+let ALL_TASKS = JSON.parse(document.getElementById('calTaskData').textContent);
+
+function refreshFromServer() {
+  fetch('/api/calendar_tasks').then(r => r.json()).then(data => { ALL_TASKS = data; render(); });
+}
+
+// ── State ─────────────────────────────────────────────────────────────
+let view = 'month';
+let today = new Date();
+let cursor = new Date(today);
+
+// ── Helpers ───────────────────────────────────────────────────────────
+const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+const DAYS_S  = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+const DAYS_F  = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+
+function ymd(d) {
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+function parseD(s) {
+  if (!s) return null;
+  return new Date(s.length === 10 ? s + 'T00:00:00' : s);
+}
+function dDate(s)  { const d = parseD(s); return d ? ymd(d) : null; }
+function dHour(s)  { if (!s || s.length <= 10) return null; return parseD(s).getHours(); }
+function dMin(s)   { if (!s || s.length <= 10) return 0;    return parseD(s).getMinutes(); }
+function fTime(s)  { if (!s || s.length <= 10) return null; const d = parseD(s); return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`; }
+function isOD(t)   { return t.deadline && parseD(t.deadline) < new Date(); }
+function trunc(s, n) { return s.length > n ? s.slice(0, n) + '…' : s; }
+
+function srcClass(t) {
+  if (t.source === 'matrix' || t.in_matrix) return 'source-matrix';
+  if (t.source === 'ai') return 'source-ai';
+  return 'source-manual';
+}
+function pillCls(t)     { return `cal-pill ${srcClass(t)} ${t.done?'done':''} ${isOD(t)?'overdue':''}`; }
+function weekPillCls(t) { return `cal-week-pill ${srcClass(t)} ${t.done?'done':''}`; }
+
+// ── Navigation ────────────────────────────────────────────────────────
+function shiftPeriod(dir) {
+  if (view==='month') cursor.setMonth(cursor.getMonth()+dir);
+  else if (view==='week') cursor.setDate(cursor.getDate()+dir*7);
+  else cursor.setDate(cursor.getDate()+dir);
+  render();
+}
+function goToday() { cursor = new Date(today); render(); }
+function setView(v, ds) {
+  view = v;
+  if (ds) { const p = ds.split('-'); cursor = new Date(+p[0],+p[1]-1,+p[2]); }
+  ['Month','Week','Day'].forEach(n => {
+    document.getElementById('btn'+n).classList.toggle('active', v===n.toLowerCase());
+  });
+  render();
+}
+function openDay(ds) { setView('day', ds); }
+
+// ── Drag ──────────────────────────────────────────────────────────────
+let dragId = null;
+function onDragStart(e, id) { dragId = id; e.dataTransfer.effectAllowed='move'; e.dataTransfer.setData('text/plain',String(id)); }
+function onDragOver(e, el)  { e.preventDefault(); document.querySelectorAll('.drag-over').forEach(x=>x.classList.remove('drag-over')); el.classList.add('drag-over'); }
+function onDragLeave(el)    { el.classList.remove('drag-over'); }
+
+function onDropDay(e, ds) {
+  e.preventDefault(); document.querySelectorAll('.drag-over').forEach(x=>x.classList.remove('drag-over'));
+  if (!dragId) return;
+  const t = ALL_TASKS.find(x=>x.id===dragId); if (!t) return;
+  let dl = ds;
+  if (t.deadline && t.deadline.length > 10) dl = ds + t.deadline.substring(10);
+  doUpdate(dragId, dl); dragId = null;
+}
+function onDropHour(e, ds, h, m) {
+  e.preventDefault(); document.querySelectorAll('.drag-over').forEach(x=>x.classList.remove('drag-over'));
+  if (!dragId) return;
+  doUpdate(dragId, `${ds}T${String(h).padStart(2,'0')}:${String(m||0).padStart(2,'0')}`); dragId = null;
+}
+function doUpdate(id, deadline) {
+  fetch(`/api/tasks/update_deadline/${id}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({deadline})})
+    .then(r=>r.json()).then(d=>{ if(d.ok){ const t=ALL_TASKS.find(x=>x.id===id); if(t) t.deadline=deadline; render(); }});
+}
+
+// ── Time grid (shared by week + day) ─────────────────────────────────
+function buildTimeGrid(cols, isDay) {
+  const HH = isDay ? 72 : 56;
+  const todayStr = ymd(today);
+  const nowH = today.getHours(), nowM = today.getMinutes();
+  const gc = isDay ? 'grid-template-columns:56px 1fr' : `grid-template-columns:52px repeat(${cols.length},1fr)`;
+
+  // Column headers (clickable → day view)
+  const headers = cols.map(c => `
+    <div class="cal-week-col-header ${c.isToday?'is-today':''}" onclick="openDay('${c.ds}')" style="cursor:pointer;">
+      <div class="wh-day">${c.dayLbl}</div>
+      <div class="wh-date">${c.dateN}</div>
+      ${c.monLbl ? `<div style="font-size:10px;color:var(--text-muted);">${c.monLbl}</div>` : ''}
+    </div>`).join('');
+
+  // All-day row
+  const allDayRow = cols.map(c => {
+    const pills = (c.allDay||[]).map(t => `
+      <div class="${pillCls(t)}" draggable="true" ondragstart="onDragStart(event,${t.id})" onclick="event.stopPropagation()" title="${t.text}" style="margin-bottom:2px;">
+        <span class="p-dot"></span>
+        <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${isDay ? t.text : trunc(t.text,18)}</span>
+      </div>`).join('');
+    return `<div style="padding:4px;border-right:1px solid var(--border);min-height:30px;"
+      ondragover="onDragOver(event,this)" ondragleave="onDragLeave(this)" ondrop="onDropDay(event,'${c.ds}')">${pills}</div>`;
+  }).join('');
+
+  // Hour rows
+  let rows = '';
+  for (let h = 0; h < 24; h++) {
+    const lbl = h === 0 ? '' : `${String(h).padStart(2,'0')}:00`;
+    const cells = cols.map(c => {
+      const tasks = c.byHour[h] || [];
+      const nowLine = (c.isToday && h === nowH)
+        ? `<div class="cal-now-line" style="top:${(nowM/60)*HH}px;"></div>` : '';
+
+      const pills = tasks.map(t => {
+        const top = (dMin(t.deadline)/60)*HH;
+        const timeStr = fTime(t.deadline) || '';
+        if (isDay) {
+          return `<div class="${weekPillCls(t)}"
+            style="position:absolute;top:${top}px;left:3px;right:3px;white-space:normal;overflow:visible;line-height:1.4;padding:4px 8px;z-index:2;min-height:24px;"
+            draggable="true" ondragstart="onDragStart(event,${t.id})" onclick="event.stopPropagation()" title="${t.text}">
+            ${timeStr ? `<span style="font-size:10px;opacity:0.65;margin-right:4px;">${timeStr}</span>` : ''}${t.text}
+          </div>`;
+        } else {
+          return `<div class="${weekPillCls(t)}"
+            style="position:absolute;top:${top}px;left:2px;right:2px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;"
+            draggable="true" ondragstart="onDragStart(event,${t.id})" onclick="event.stopPropagation()" title="${t.text}">
+            ${timeStr ? `<span style="font-size:9px;opacity:0.65;margin-right:2px;">${timeStr}</span>` : ''}${trunc(t.text,13)}
+          </div>`;
+        }
+      }).join('');
+
+      if (isDay) {
+        // Quarter-hour drop zones
+        const quarters = [0,15,30,45].map(m => `
+          <div style="height:${HH/4}px;"
+            ondragover="onDragOver(event,this)" ondragleave="onDragLeave(this)"
+            ondrop="onDropHour(event,'${c.ds}',${h},${m})"></div>`).join('');
+        return `<div class="cal-hour-cell" style="height:${HH}px;position:relative;">
+          ${nowLine}
+          <div style="position:absolute;inset:0;display:flex;flex-direction:column;">${quarters}</div>
+          ${pills}
+        </div>`;
+      } else {
+        return `<div class="cal-hour-cell" style="height:${HH}px;position:relative;"
+          ondragover="onDragOver(event,this)" ondragleave="onDragLeave(this)"
+          ondrop="onDropHour(event,'${c.ds}',${h},0)">${nowLine}${pills}</div>`;
+      }
+    }).join('');
+
+    rows += `<div style="display:contents;">
+      <div class="cal-time-slot" style="height:${HH}px;"><span class="cal-time-label">${lbl}</span></div>
+      ${cells}
+    </div>`;
+  }
+
+  return `<div class="cal-week">
+    <div class="cal-week-header" style="${gc};display:grid;">
+      <div style="border-right:1px solid var(--border);padding:10px 6px;">
+        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-dim);">All day</div>
+      </div>${headers}
+    </div>
+    <div style="display:grid;${gc};border-bottom:1px solid var(--border);background:var(--surface2);">
+      <div style="border-right:1px solid var(--border);"></div>${allDayRow}
+    </div>
+    <div class="cal-week-body">
+      <div style="display:grid;${gc};flex:1;width:100%;">${rows}</div>
+    </div>
+  </div>`;
+}
+
+function makeCol(d) {
+  const ds = ymd(d);
+  const byHour = {}, allDay = [];
+  ALL_TASKS.forEach(t => {
+    if (!t.deadline || dDate(t.deadline) !== ds) return;
+    const h = dHour(t.deadline);
+    if (h !== null) { if (!byHour[h]) byHour[h]=[]; byHour[h].push(t); }
+    else allDay.push(t);
+  });
+  return { ds, dayLbl: DAYS_S[d.getDay()], dateN: d.getDate(), monLbl: null, isToday: ds===ymd(today), byHour, allDay };
+}
+
+// ── Month view ────────────────────────────────────────────────────────
+function renderMonth() {
+  const yr = cursor.getFullYear(), mo = cursor.getMonth();
+  document.getElementById('calPeriodLabel').textContent = `${MONTHS[mo]} ${yr}`;
+  const first = new Date(yr,mo,1).getDay();
+  const dim   = new Date(yr,mo+1,0).getDate();
+  const prev  = new Date(yr,mo,0).getDate();
+  const tds   = ymd(today);
+  const byDate = {};
+  ALL_TASKS.forEach(t => { const d=dDate(t.deadline); if(d){if(!byDate[d])byDate[d]=[];byDate[d].push(t);} });
+
+  let cells = '';
+  for (let i=first-1;i>=0;i--) {
+    const d=new Date(yr,mo-1,prev-i), ds=ymd(d);
+    cells += `<div class="cal-day other-month" ondragover="onDragOver(event,this)" ondragleave="onDragLeave(this)" ondrop="onDropDay(event,'${ds}')" onclick="openDay('${ds}')"><div class="cal-day-num">${prev-i}</div></div>`;
+  }
+  for (let d=1;d<=dim;d++) {
+    const ds=`${yr}-${String(mo+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const tasks=byDate[ds]||[];
+    const pills=tasks.slice(0,4).map(t=>`
+      <div class="${pillCls(t)}" draggable="true" ondragstart="onDragStart(event,${t.id})" onclick="event.stopPropagation();openDay('${ds}')" title="${t.text}">
+        <span class="p-dot"></span><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${trunc(t.text,20)}</span>
+      </div>`).join('');
+    const more=tasks.length>4?`<div style="font-size:10px;color:var(--text-dim);padding:1px 4px;cursor:pointer;" onclick="event.stopPropagation();openDay('${ds}')">+${tasks.length-4} more</div>`:'';
+    cells+=`<div class="cal-day ${ds===tds?'is-today':''}" ondragover="onDragOver(event,this)" ondragleave="onDragLeave(this)" ondrop="onDropDay(event,'${ds}')" onclick="openDay('${ds}')">
+      <div class="cal-day-num">${d}</div>
+      <div class="cal-day-tasks">${pills}${more}</div>
+    </div>`;
+  }
+  const rem=(first+dim)%7===0?0:7-(first+dim)%7;
+  for (let d=1;d<=rem;d++) {
+    const ds=ymd(new Date(yr,mo+1,d));
+    cells+=`<div class="cal-day other-month" ondragover="onDragOver(event,this)" ondragleave="onDragLeave(this)" ondrop="onDropDay(event,'${ds}')" onclick="openDay('${ds}')"><div class="cal-day-num">${d}</div></div>`;
+  }
+  return `<div class="cal-month">
+    <div class="cal-weekdays">${DAYS_S.map(d=>`<div class="cal-weekday">${d}</div>`).join('')}</div>
+    <div class="cal-days">${cells}</div>
+  </div>`;
+}
+
+// ── Week view ─────────────────────────────────────────────────────────
+function renderWeek() {
+  const dow=cursor.getDay();
+  const dates=Array.from({length:7},(_,i)=>{const d=new Date(cursor);d.setDate(cursor.getDate()-dow+i);return d;});
+  const s=dates[0], e=dates[6];
+  document.getElementById('calPeriodLabel').textContent=`${s.getDate()} ${MONTHS[s.getMonth()].slice(0,3)} – ${e.getDate()} ${MONTHS[e.getMonth()].slice(0,3)} ${e.getFullYear()}`;
+  return buildTimeGrid(dates.map(d=>makeCol(d)), false);
+}
+
+// ── Day view ──────────────────────────────────────────────────────────
+function renderDay() {
+  const ds=ymd(cursor);
+  document.getElementById('calPeriodLabel').textContent=`${DAYS_F[cursor.getDay()]}, ${cursor.getDate()} ${MONTHS[cursor.getMonth()]} ${cursor.getFullYear()}`;
+  const col=makeCol(cursor);
+  col.monLbl=MONTHS[cursor.getMonth()].slice(0,3);
+
+  const dayTasks=ALL_TASKS.filter(t=>t.deadline&&dDate(t.deadline)===ds);
+  const done=dayTasks.filter(t=>t.done).length;
+  const remaining=dayTasks.length-done;
+  const stats=dayTasks.length>0?`
+    <div style="display:flex;gap:12px;margin-bottom:16px;font-size:13px;color:var(--text-muted);flex-wrap:wrap;">
+      <span><strong style="color:var(--text);">${dayTasks.length}</strong> task${dayTasks.length!==1?'s':''} due</span>
+      <span style="color:var(--text-dim);">·</span>
+      <span><strong style="color:var(--upcoming);">${done}</strong> completed</span>
+      ${remaining>0?`<span style="color:var(--text-dim);">·</span><span><strong style="color:var(--accent);">${remaining}</strong> remaining</span>`:''}
+    </div>`:
+    `<div style="margin-bottom:16px;font-size:13px;color:var(--text-dim);font-style:italic;">Nothing due today — enjoy the breathing room.</div>`;
+
+  return stats + buildTimeGrid([col], true);
+}
+
+// ── Unscheduled ───────────────────────────────────────────────────────
+function renderUnscheduled() {
+  const tasks=ALL_TASKS.filter(t=>!t.deadline);
+  document.getElementById('unscheduledCount').textContent=tasks.length;
+  document.getElementById('unscheduledBody').innerHTML=tasks.length===0
+    ?'<span style="font-size:13px;color:var(--text-dim);font-style:italic;">All tasks have deadlines ✓</span>'
+    :tasks.map(t=>`<div class="${pillCls(t)}" draggable="true" ondragstart="onDragStart(event,${t.id})" title="${t.text}" style="padding:4px 10px;font-size:12px;max-width:none;"><span class="p-dot"></span>${t.text}</div>`).join('');
+}
+
+let unscheduledOpen=false;
+function toggleUnscheduled() {
+  unscheduledOpen=!unscheduledOpen;
+  document.getElementById('unscheduledBody').style.display=unscheduledOpen?'flex':'none';
+  document.getElementById('unscheduledChevron').textContent=unscheduledOpen?'▴':'▾';
+}
+
+// ── Render ────────────────────────────────────────────────────────────
+function render() {
+  const body=document.getElementById('calBody');
+  if (view==='month')     body.innerHTML=renderMonth();
+  else if (view==='week') body.innerHTML=renderWeek();
+  else                    body.innerHTML=renderDay();
+  renderUnscheduled();
+  if (view==='week'||view==='day') {
+    const wb=document.querySelector('.cal-week-body');
+    if (wb) wb.scrollTop=view==='day'?Math.max(0,today.getHours()-1)*72:8*56;
+  }
+}
+
+render();
+</script>
+{% endblock %}

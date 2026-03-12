@@ -34,8 +34,13 @@
     </div>
     <div class="dt-picker" id="taskDtPicker"></div>
   </div>
-  <button type="submit" class="add-btn">Add</button>
+  <button type="submit" class="add-btn" id="taskAddBtn">Add</button>
 </form>
+<div id="taskDatePreview" style="display:none;font-size:13px;color:var(--accent);padding:6px 14px 10px;align-items:center;gap:6px;">
+  <span style="opacity:0.6;">📅</span>
+  <span>Deadline: <strong id="taskDatePreviewText"></strong></span>
+  <span style="font-size:11px;color:var(--text-dim);margin-left:4px;">— looks right? Hit Add</span>
+</div>
 
 <div class="filter-tabs">
   <a href="?filter=all&sort={{ sort_value }}" class="filter-tab {{ 'active' if filter_value=='all' else '' }}">All</a>
@@ -236,6 +241,10 @@ function applyPicker(id) {
   const pill = document.getElementById(s.pillId);
   document.getElementById(s.pillLabelId).textContent = label;
   pill.classList.add('has-date');
+  // Show preview
+  const preview = document.getElementById('taskDatePreview');
+  const previewText = document.getElementById('taskDatePreviewText');
+  if (preview && previewText) { previewText.textContent = label; preview.style.display = 'flex'; }
   closeAllPickers();
 }
 
@@ -246,6 +255,8 @@ function clearPicker(id, e) {
   document.getElementById(s.hiddenId).value = '';
   document.getElementById(s.pillLabelId).textContent = 'No date';
   document.getElementById(s.pillId).classList.remove('has-date');
+  const preview = document.getElementById('taskDatePreview');
+  if (preview) preview.style.display = 'none';
   closeAllPickers();
 }
 

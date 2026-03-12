@@ -29,6 +29,13 @@
   <input type="hidden" name="label" id="priorityValue" value="none" />
   <button type="submit" class="add-btn">Add</button>
 
+  <div id="ideaDatePreview" style="display:none;font-size:13px;color:var(--accent);padding:4px 14px 8px;align-items:center;gap:6px;width:100%;">
+    <span style="opacity:0.6;">📅</span>
+    <span>Deadline: <strong id="ideaDatePreviewText"></strong></span>
+    <span style="font-size:11px;color:var(--text-dim);margin-left:4px;">— looks right? Hit Add</span>
+    <span style="font-size:10px;color:var(--text-dim);margin-left:2px;">— deadline will be set to this</span>
+  </div>
+
   <div class="priority-toggle-row">
     <span class="priority-toggle-label">Priority:</span>
     <div class="priority-toggles">
@@ -159,6 +166,9 @@
     const pill = document.getElementById(s.pillId);
     document.getElementById(s.pillLabelId).textContent = label;
     pill.classList.add('has-date');
+    const preview = document.getElementById('ideaDatePreview');
+    const previewText = document.getElementById('ideaDatePreviewText');
+    if (preview && previewText) { previewText.textContent = label; preview.style.display = 'flex'; }
     closeAllPickers();
   }
   function clearPicker(id, e) {
@@ -168,6 +178,8 @@
     document.getElementById(s.hiddenId).value = '';
     document.getElementById(s.pillLabelId).textContent = 'No date';
     document.getElementById(s.pillId).classList.remove('has-date');
+    const preview = document.getElementById('ideaDatePreview');
+    if (preview) preview.style.display = 'none';
     closeAllPickers();
   }
   document.addEventListener('click', function(e) {
