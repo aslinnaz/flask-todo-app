@@ -18,11 +18,13 @@
 
 <form class="add-form matrix-add-form" method="POST" action="{{ url_for('add_idea') }}">
   <input name="text" placeholder="What's the idea or task?" autocomplete="off" class="add-input" />
-  <div class="date-pill-wrapper">
-    <div class="date-pill" id="ideaDatePill">
-      📅 <span class="pill-label">No date</span><span class="pill-clear" onclick="clearIdeaDate(event)">✕</span>
+  <input type="hidden" name="deadline" id="ideaDeadlineValue" />
+  <div class="date-pill-wrapper" id="ideaPickerWrapper">
+    <div class="date-pill" id="ideaDatePill" onclick="togglePicker('idea')">
+      📅 <span class="pill-label" id="ideaPillLabel">No date</span>
+      <span class="pill-clear" onclick="clearPicker('idea', event)">✕</span>
     </div>
-    <input name="deadline" type="datetime-local" class="date-pill-input" id="ideaDateInput" onchange="onIdeaDateChange(this)" />
+    <div class="dt-picker" id="ideaDtPicker"></div>
   </div>
   <input type="hidden" name="label" id="priorityValue" value="none" />
   <button type="submit" class="add-btn">Add</button>
@@ -39,36 +41,141 @@
 </form>
 
 <script>
+  // Priority toggles
   setPriority('none');
   function setPriority(val) {
     document.getElementById('priorityValue').value = val;
     document.querySelectorAll('.ptoggle').forEach(b => b.classList.remove('active'));
     document.getElementById('pt-' + val).classList.add('active');
   }
-  function onIdeaDateChange(input) {
-    const pill = document.getElementById('ideaDatePill');
-    const label = pill.querySelector('.pill-label');
-    if (input.value) {
-      const d = new Date(input.value);
-      const hasTime = input.value.length > 10;
-      if (hasTime) {
-        label.textContent = d.toLocaleDateString('en-GB', {day:'numeric',month:'short',year:'numeric'})
-          + ', ' + d.toLocaleTimeString('en-GB', {hour:'2-digit', minute:'2-digit'});
-      } else {
-        label.textContent = d.toLocaleDateString('en-GB', {day:'numeric',month:'short',year:'numeric'});
-      }
-      pill.classList.add('has-date');
-    } else {
-      label.textContent = 'No date';
-      pill.classList.remove('has-date');
+
+  // ── Custom DateTime Picker (shared logic) ──────────────────────────
+  const pickerState = {};
+
+  function initPicker(id, hiddenId, pillId, pillLabelId, wrapperId) {
+    pickerState[id] = { viewYear: null, viewMonth: null, selYear: null, selMonth: null, selDay: null, selHour: null, selMin: null, hiddenId, pillId, pillLabelId, wrapperId };
+  }
+  function togglePicker(id) {
+    const el = document.getElementById(id + 'DtPicker');
+    const isOpen = el.classList.contains('open');
+    closeAllPickers();
+    if (!isOpen) openPicker(id);
+  }
+  function openPicker(id) {
+    const s = pickerState[id]; const now = new Date();
+    s.viewYear = s.selYear || now.getFullYear();
+    s.viewMonth = s.selMonth !== null ? s.selMonth : now.getMonth();
+    renderPicker(id);
+    const el = document.getElementById(id + 'DtPicker');
+    el.classList.add('open');
+    const pill = document.getElementById(s.pillId);
+    const rect = pill.getBoundingClientRect();
+    const pickerW = 300;
+    let left = rect.left;
+    if (left + pickerW > window.innerWidth - 12) left = window.innerWidth - pickerW - 12;
+    el.style.top = (rect.bottom + 8) + 'px';
+    el.style.left = left + 'px';
+  }
+  function closeAllPickers() {
+    document.querySelectorAll('.dt-picker').forEach(p => p.classList.remove('open'));
+  }
+  function renderPicker(id) {
+    const s = pickerState[id];
+    const el = document.getElementById(id + 'DtPicker');
+    const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+    const days = ['Su','Mo','Tu','We','Th','Fr','Sa'];
+    const today = new Date();
+    const firstDay = new Date(s.viewYear, s.viewMonth, 1).getDay();
+    const daysInMonth = new Date(s.viewYear, s.viewMonth + 1, 0).getDate();
+    const prevDays = new Date(s.viewYear, s.viewMonth, 0).getDate();
+    let dayCells = '';
+    for (let i = firstDay - 1; i >= 0; i--) dayCells += `<button type="button" class="other-month" disabled>${prevDays - i}</button>`;
+    for (let d = 1; d <= daysInMonth; d++) {
+      const isToday = d === today.getDate() && s.viewMonth === today.getMonth() && s.viewYear === today.getFullYear();
+      const isSel = d === s.selDay && s.viewMonth === s.selMonth && s.viewYear === s.selYear;
+      dayCells += `<button type="button" class="${isToday?'today':''} ${isSel?'selected':''}" onclick="selectDay('${id}',${d})">${d}</button>`;
     }
+    const remaining = 42 - firstDay - daysInMonth;
+    for (let d = 1; d <= remaining; d++) dayCells += `<button type="button" class="other-month" disabled>${d}</button>`;
+    const hourVal = s.selHour !== null ? String(s.selHour).padStart(2,'0') : '';
+    const minVal  = s.selMin  !== null ? String(s.selMin).padStart(2,'0') : '';
+    el.innerHTML = `
+      <div class="dt-picker-header">
+        <span class="dt-picker-month-label">${months[s.viewMonth]} ${s.viewYear}</span>
+        <div class="dt-picker-nav">
+          <button type="button" onclick="shiftMonth('${id}',-1)">‹</button>
+          <button type="button" onclick="shiftMonth('${id}',1)">›</button>
+        </div>
+      </div>
+      <div class="dt-picker-weekdays">${days.map(d=>`<span>${d}</span>`).join('')}</div>
+      <div class="dt-picker-days">${dayCells}</div>
+      <div class="dt-picker-time">
+        <span class="dt-picker-time-label">Time</span>
+        <div class="dt-picker-time-inputs">
+          <input class="dt-time-input" id="${id}HourInput" type="number" min="0" max="23" placeholder="HH" value="${hourVal}" />
+          <span class="dt-time-sep">:</span>
+          <input class="dt-time-input" id="${id}MinInput" type="number" min="0" max="59" placeholder="MM" value="${minVal}" />
+        </div>
+        <button type="button" class="dt-time-clear" onclick="clearTime('${id}')">clear</button>
+      </div>
+      <div class="dt-picker-actions">
+        <button type="button" class="dt-btn-cancel" onclick="closeAllPickers()">Cancel</button>
+        <button type="button" class="dt-btn-apply" onclick="applyPicker('${id}')">Apply</button>
+      </div>`;
   }
-  function clearIdeaDate(e) {
-    e.stopPropagation();
-    const input = document.getElementById('ideaDateInput');
-    input.value = '';
-    onIdeaDateChange(input);
+  function shiftMonth(id, dir) {
+    const s = pickerState[id];
+    s.viewMonth += dir;
+    if (s.viewMonth > 11) { s.viewMonth = 0; s.viewYear++; }
+    if (s.viewMonth < 0)  { s.viewMonth = 11; s.viewYear--; }
+    renderPicker(id);
   }
+  function selectDay(id, d) {
+    const s = pickerState[id];
+    s.selDay = d; s.selMonth = s.viewMonth; s.selYear = s.viewYear;
+    renderPicker(id);
+  }
+  function clearTime(id) {
+    const s = pickerState[id]; s.selHour = null; s.selMin = null; renderPicker(id);
+  }
+  function applyPicker(id) {
+    const s = pickerState[id];
+    if (!s.selDay) { closeAllPickers(); return; }
+    const hInput = document.getElementById(id + 'HourInput');
+    const mInput = document.getElementById(id + 'MinInput');
+    const h = hInput && hInput.value !== '' ? parseInt(hInput.value) : null;
+    const m = mInput && mInput.value !== '' ? parseInt(mInput.value) : null;
+    s.selHour = (h !== null && !isNaN(h)) ? Math.min(23, Math.max(0, h)) : null;
+    s.selMin  = (m !== null && !isNaN(m)) ? Math.min(59, Math.max(0, m)) : null;
+    const pad = n => String(n).padStart(2,'0');
+    const dateStr = `${s.selYear}-${pad(s.selMonth+1)}-${pad(s.selDay)}`;
+    let value = dateStr;
+    let label = new Date(dateStr + 'T12:00:00').toLocaleDateString('en-GB', {day:'numeric',month:'short',year:'numeric'});
+    if (s.selHour !== null && s.selMin !== null) {
+      value += `T${pad(s.selHour)}:${pad(s.selMin)}`;
+      label += `, ${pad(s.selHour)}:${pad(s.selMin)}`;
+    }
+    document.getElementById(s.hiddenId).value = value;
+    const pill = document.getElementById(s.pillId);
+    document.getElementById(s.pillLabelId).textContent = label;
+    pill.classList.add('has-date');
+    closeAllPickers();
+  }
+  function clearPicker(id, e) {
+    if (e) e.stopPropagation();
+    const s = pickerState[id];
+    s.selYear = s.selMonth = s.selDay = s.selHour = s.selMin = null;
+    document.getElementById(s.hiddenId).value = '';
+    document.getElementById(s.pillLabelId).textContent = 'No date';
+    document.getElementById(s.pillId).classList.remove('has-date');
+    closeAllPickers();
+  }
+  document.addEventListener('click', function(e) {
+    if (!e.target.closest('.date-pill-wrapper')) closeAllPickers();
+  });
+
+  // Init idea picker
+  initPicker('idea', 'ideaDeadlineValue', 'ideaDatePill', 'ideaPillLabel', 'ideaPickerWrapper');
 </script>
 
 <div class="matrix-grid">

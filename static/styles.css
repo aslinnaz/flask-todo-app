@@ -114,7 +114,7 @@ body {
 .add-input { flex: 1; background: transparent; border: none; outline: none; color: var(--text); font-size: 15px; font-family: inherit; padding: 10px 12px; }
 .add-input::placeholder { color: var(--text-dim); }
 
-/* Custom date pill */
+/* Custom date pill - hide native input entirely */
 .date-pill-wrapper { position: relative; display: flex; align-items: center; flex-shrink: 0; }
 
 .date-pill {
@@ -129,10 +129,97 @@ body {
 }
 .date-pill:hover { border-color: var(--border2); color: var(--text); }
 .date-pill.has-date { color: var(--accent); background: rgba(138,109,76,0.08); border-color: rgba(138,109,76,0.3); }
-.date-pill .pill-clear { display: none; font-size: 10px; opacity: 0.6; margin-left: 2px; }
+.date-pill .pill-clear { display: none; font-size: 10px; opacity: 0.6; margin-left: 2px; cursor: pointer; }
 .date-pill.has-date .pill-clear { display: inline; }
 
-.date-pill-input { position: absolute; inset: 0; opacity: 0; width: 100%; cursor: pointer; }
+/* Custom DateTime Picker Popover */
+.dt-picker {
+  position: fixed; z-index: 1000;
+  background: var(--surface); border: 1px solid var(--border2);
+  border-radius: 14px; padding: 16px;
+  box-shadow: 0 8px 32px rgba(44,39,31,0.15), 0 2px 8px rgba(44,39,31,0.08);
+  width: 300px; display: none; flex-direction: column; gap: 12px;
+  animation: pickerFadeIn 0.15s ease;
+}
+.dt-picker.open { display: flex; }
+@keyframes pickerFadeIn { from { opacity:0; transform: translateY(-4px); } to { opacity:1; transform: translateY(0); } }
+
+.dt-picker-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding-bottom: 10px; border-bottom: 1px solid var(--border);
+}
+.dt-picker-month-label {
+  font-family: 'DM Serif Display', serif; font-size: 16px; color: var(--text); letter-spacing: -0.2px;
+}
+.dt-picker-nav {
+  display: flex; gap: 2px;
+}
+.dt-picker-nav button {
+  width: 28px; height: 28px; border-radius: 7px; border: 1px solid var(--border);
+  background: transparent; cursor: pointer; color: var(--text-muted);
+  font-size: 13px; font-family: inherit; display: flex; align-items: center; justify-content: center;
+  transition: all 0.12s;
+}
+.dt-picker-nav button:hover { background: var(--surface2); color: var(--text); border-color: var(--border2); }
+
+.dt-picker-weekdays {
+  display: grid; grid-template-columns: repeat(7, 1fr);
+  gap: 2px; margin-bottom: 2px;
+}
+.dt-picker-weekdays span {
+  text-align: center; font-size: 11px; font-weight: 600;
+  color: var(--text-dim); padding: 4px 0; letter-spacing: 0.3px;
+}
+
+.dt-picker-days {
+  display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px;
+}
+.dt-picker-days button {
+  aspect-ratio: 1; border-radius: 7px; border: none; background: transparent;
+  cursor: pointer; font-size: 13px; font-family: inherit; color: var(--text-muted);
+  transition: all 0.12s; display: flex; align-items: center; justify-content: center;
+}
+.dt-picker-days button:hover { background: var(--surface2); color: var(--text); }
+.dt-picker-days button.today { color: var(--accent); font-weight: 700; }
+.dt-picker-days button.selected { background: var(--accent); color: #fff; font-weight: 600; }
+.dt-picker-days button.selected:hover { background: var(--accent2); }
+.dt-picker-days button.other-month { opacity: 0.3; }
+.dt-picker-days button:disabled { opacity: 0.2; cursor: default; }
+
+/* Time row */
+.dt-picker-time {
+  border-top: 1px solid var(--border); padding-top: 10px;
+  display: flex; align-items: center; gap: 8px;
+}
+.dt-picker-time-label {
+  font-size: 12px; color: var(--text-muted); font-weight: 500; flex-shrink: 0;
+}
+.dt-picker-time-inputs {
+  display: flex; align-items: center; gap: 4px; flex: 1;
+}
+.dt-time-input {
+  width: 44px; text-align: center; background: var(--surface2);
+  border: 1px solid var(--border); border-radius: 7px;
+  color: var(--text); font-size: 14px; font-family: inherit;
+  font-weight: 500; padding: 5px 4px; outline: none;
+  transition: border-color 0.12s;
+}
+.dt-time-input:focus { border-color: var(--accent); }
+.dt-time-sep { font-size: 16px; color: var(--text-muted); font-weight: 700; line-height: 1; }
+.dt-time-clear { font-size: 11px; color: var(--text-dim); cursor: pointer; padding: 3px 6px; border-radius: 5px; border: 1px solid transparent; background: transparent; font-family: inherit; transition: all 0.12s; }
+.dt-time-clear:hover { color: var(--text-muted); background: var(--surface2); border-color: var(--border); }
+
+.dt-picker-actions {
+  display: flex; gap: 6px; justify-content: flex-end; border-top: 1px solid var(--border); padding-top: 10px;
+}
+.dt-picker-actions button {
+  padding: 6px 14px; border-radius: 8px; font-size: 13px; font-family: inherit;
+  cursor: pointer; transition: all 0.12s; font-weight: 500;
+}
+.dt-btn-cancel { background: transparent; border: 1px solid var(--border); color: var(--text-muted); }
+.dt-btn-cancel:hover { color: var(--text); border-color: var(--border2); }
+.dt-btn-apply { background: var(--accent); border: 1px solid var(--accent); color: #fff; }
+.dt-btn-apply:hover { background: var(--accent2); border-color: var(--accent2); }
 
 .add-btn {
   padding: 9px 20px; border-radius: 9px;
