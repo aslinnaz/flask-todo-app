@@ -30,7 +30,7 @@
     <div class="date-pill" id="taskDatePill">
       📅 <span class="pill-label">No date</span><span class="pill-clear" onclick="clearTaskDate(event)">✕</span>
     </div>
-    <input name="deadline" type="date" class="date-pill-input" id="taskDateInput" onchange="onTaskDateChange(this)" />
+    <input name="deadline" type="datetime-local" class="date-pill-input" id="taskDateInput" onchange="onTaskDateChange(this)" />
   </div>
   <button type="submit" class="add-btn">Add</button>
 </form>
@@ -60,11 +60,11 @@
               {{ t["deadline"] | deadline_display }}
             </span>
           {% endif %}
-          {% if t.get("matrix_label") == "both" %}
+          {% if t["matrix_label"] == "both" %}
             <span class="plabel plabel-both">Important · Urgent</span>
-          {% elif t.get("matrix_label") == "important" %}
+          {% elif t["matrix_label"] == "important" %}
             <span class="plabel plabel-important">Important</span>
-          {% elif t.get("matrix_label") == "urgent" %}
+          {% elif t["matrix_label"] == "urgent" %}
             <span class="plabel plabel-urgent">Urgent</span>
           {% endif %}
           {% if t["source"] == "ai" %}
@@ -97,8 +97,14 @@ function onTaskDateChange(input) {
   const pill = document.getElementById('taskDatePill');
   const label = pill.querySelector('.pill-label');
   if (input.value) {
-    const d = new Date(input.value + 'T00:00:00');
-    label.textContent = d.toLocaleDateString('en-GB', {day:'numeric',month:'short',year:'numeric'});
+    const d = new Date(input.value);
+    const hasTime = input.value.length > 10;
+    if (hasTime) {
+      label.textContent = d.toLocaleDateString('en-GB', {day:'numeric',month:'short',year:'numeric'})
+        + ', ' + d.toLocaleTimeString('en-GB', {hour:'2-digit', minute:'2-digit'});
+    } else {
+      label.textContent = d.toLocaleDateString('en-GB', {day:'numeric',month:'short',year:'numeric'});
+    }
     pill.classList.add('has-date');
   } else {
     label.textContent = 'No date';

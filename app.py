@@ -107,6 +107,9 @@ def deadline_display(deadline_str: str) -> str:
         return ""
     try:
         dt = datetime.fromisoformat(deadline_str)
+        # If time component is non-midnight, show it
+        if len(deadline_str) > 10 and (dt.hour != 0 or dt.minute != 0):
+            return dt.strftime("%d %b %Y, %H:%M")
         return dt.strftime("%d %b %Y")
     except Exception:
         return deadline_str
@@ -118,17 +121,34 @@ def deadline_urgency(deadline_str: str) -> str:
     if not deadline_str:
         return "none"
     try:
-        dt = datetime.fromisoformat(deadline_str).date()
-        today = datetime.now(IST).date()
-        delta = (dt - today).days
-        if delta < 0:
-            return "overdue"
-        elif delta == 0:
-            return "today"
-        elif delta <= 3:
-            return "soon"
+        dt = datetime.fromisoformat(deadline_str)
+        now = datetime.now(IST)
+        # If deadline has a time component, compare as full datetime
+        if len(deadline_str) > 10 and (dt.hour != 0 or dt.minute != 0):
+            if dt.tzinfo is None:
+                dt = dt.replace(tzinfo=IST)
+            delta_seconds = (dt - now).total_seconds()
+            if delta_seconds < 0:
+                return "overdue"
+            elif delta_seconds <= 60 * 60 * 3:  # within 3 hours
+                return "today"
+            elif delta_seconds <= 60 * 60 * 24:  # within 24 hours
+                return "soon"
+            else:
+                delta_days = (dt.date() - now.date()).days
+                return "today" if delta_days == 0 else ("soon" if delta_days <= 3 else "upcoming")
         else:
-            return "upcoming"
+            date_only = dt.date()
+            today = now.date()
+            delta = (date_only - today).days
+            if delta < 0:
+                return "overdue"
+            elif delta == 0:
+                return "today"
+            elif delta <= 3:
+                return "soon"
+            else:
+                return "upcoming"
     except Exception:
         return "none"
 
@@ -147,7 +167,10 @@ def tasks_page():
         where_clause = " WHERE t.done=1"
 
     if sort_value == "deadline":
-        order_clause = " ORDER BY CASE WHEN t.deadline IS NULL OR t.deadline='' THEN 1 ELSE 0 END, t.deadline ASC, t.id DESC"
+        order_clause = (
+            " ORDER BY CASE WHEN t.deadline IS NULL OR t.deadline='' THEN 1 ELSE 0 END,"
+            " t.deadline ASC, t.id DESC"
+        )
     else:
         order_clause = " ORDER BY t.id DESC"
 
@@ -166,7 +189,7 @@ def tasks_page():
     remaining = db.execute("SELECT COUNT(*) AS c FROM tasks WHERE done=0").fetchone()["c"]
     overdue = db.execute(
         "SELECT COUNT(*) AS c FROM tasks WHERE done=0 AND deadline IS NOT NULL AND deadline < ?",
-        (datetime.now(IST).date().isoformat(),)
+        (datetime.now(IST).strftime("%Y-%m-%dT%H:%M"),)
     ).fetchone()["c"]
 
     return render_template(
@@ -329,25 +352,38 @@ def api_chat():
             return jsonify({"error": "No OpenAI API key provided. Add it in the chat settings."}), 400
 
         today_str = datetime.now(IST).strftime("%Y-%m-%d")
+        now_str = datetime.now(IST).strftime("%Y-%m-%d %H:%M")
         system_prompt = f"""You are a smart productivity assistant embedded in a To-Do + Eisenhower Matrix planner app.
-Today's date is {today_str}. Use this when the user mentions "today", "tomorrow", "this week", etc.
+Current date and time: {now_str}. Use this when the user mentions "today", "tomorrow", "this week", "at 3pm", etc.
+Deadlines should be in ISO format: YYYY-MM-DDTHH:MM if a time is given, or YYYY-MM-DD if date only.
 
-Your job:
-1. Help users clarify vague problems into concrete, actionable tasks.
-2. If the user's request is broad or unclear, ask ONE focused clarifying question.
-3. Once you understand, break the problem into specific tasks (max 5-7 subtasks).
-4. For each task, suggest a priority label: "important+urgent", "important", "urgent", or "none".
-5. Suggest a deadline if appropriate (YYYY-MM-DD format).
+## Your behaviour rules — follow strictly:
 
-When you have enough info to create tasks, output a JSON block at the END of your message like:
+**If the user's message is SPECIFIC and actionable** (contains a clear task or list of tasks, even if brief):
+- Immediately break it into tasks. Do NOT ask questions.
+- Output a short one-line acknowledgement, then the <tasks> block.
+- Assign priorities and deadlines where obvious from context.
+
+**If the user's message is VAGUE or HIGH-LEVEL** (e.g. "I'm stressed", "help me with my project", "I have a lot to do"):
+- Ask ONE short, focused clarifying question to understand scope.
+- Do not create tasks yet.
+
+## Priority labels:
+- "important+urgent" → Do Now (deadline soon, high stakes)
+- "important" → Schedule (important but not time-critical)
+- "urgent" → Delegate (time-sensitive but lower importance)
+- "none" → Eliminate
+
+## Output format when creating tasks:
+Brief one-line response, then:
 <tasks>
 [
-  {{"text": "Task description", "label": "important+urgent", "deadline": "{today_str}"}},
+  {{"text": "Task description", "label": "important+urgent", "deadline": "2024-03-15T14:00"}},
   {{"text": "Another task", "label": "important", "deadline": null}}
 ]
 </tasks>
 
-Be conversational, warm, and brief. Don't over-explain. Ask at most one question per turn."""
+Keep responses short. Never explain your reasoning at length. Never ask more than one question."""
 
         payload = json.dumps({
             "model": "gpt-4o-mini",

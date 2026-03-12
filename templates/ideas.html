@@ -22,7 +22,7 @@
     <div class="date-pill" id="ideaDatePill">
       📅 <span class="pill-label">No date</span><span class="pill-clear" onclick="clearIdeaDate(event)">✕</span>
     </div>
-    <input name="deadline" type="date" class="date-pill-input" id="ideaDateInput" onchange="onIdeaDateChange(this)" />
+    <input name="deadline" type="datetime-local" class="date-pill-input" id="ideaDateInput" onchange="onIdeaDateChange(this)" />
   </div>
   <input type="hidden" name="label" id="priorityValue" value="none" />
   <button type="submit" class="add-btn">Add</button>
@@ -49,8 +49,14 @@
     const pill = document.getElementById('ideaDatePill');
     const label = pill.querySelector('.pill-label');
     if (input.value) {
-      const d = new Date(input.value + 'T00:00:00');
-      label.textContent = d.toLocaleDateString('en-GB', {day:'numeric',month:'short',year:'numeric'});
+      const d = new Date(input.value);
+      const hasTime = input.value.length > 10;
+      if (hasTime) {
+        label.textContent = d.toLocaleDateString('en-GB', {day:'numeric',month:'short',year:'numeric'})
+          + ', ' + d.toLocaleTimeString('en-GB', {hour:'2-digit', minute:'2-digit'});
+      } else {
+        label.textContent = d.toLocaleDateString('en-GB', {day:'numeric',month:'short',year:'numeric'});
+      }
       pill.classList.add('has-date');
     } else {
       label.textContent = 'No date';
